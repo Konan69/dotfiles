@@ -1,0 +1,26 @@
+# Ghostty Terminal Configuration
+# Theme and Colors
+theme = Nord
+
+# Font - No need for patched Nerd Fonts! Ghostty has built-in Nerd Font symbols
+font-family = JetBrains Mono
+font-size = 14
+
+# Shell - Use fish as login shell
+command = /usr/local/bin/fish -l
+
+# Shell Integration
+shell-integration = fish
+
+# Window settings
+window-padding-x = 10
+window-padding-y = 10
+
+# Keybindings (macOS-friendly)
+keybind = super+t=new_tab
+keybind = super+d=new_split:right
+keybind = super+shift+d=new_split:down
+keybind = super+w=close_surface
+
+# Background opacity (optional, for aesthetics)
+background-opacity = 0.95
