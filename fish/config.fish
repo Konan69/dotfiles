@@ -1,12 +1,12 @@
 # Inherit environment from zsh (PATH, variables, etc.)
 bass source ~/.zshrc 2>/dev/null
 
-# Initialize fnm (Node version manager) - must be after zshrc to override NVM
-fnm env --use-on-cd --shell fish | source
-
 if status is-interactive
     # Initialize zoxide (smarter cd)
     zoxide init fish | source
+
+    # Load direnv for per-project environment variables
+    direnv hook fish | source
 
     # Replace cd with zoxide
     alias cd='z'

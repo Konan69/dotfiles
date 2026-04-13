@@ -1,3 +1,6 @@
 export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.local/npm-global/bin:$PATH"
 export PATH="$HOME/.antigravity/antigravity/bin:$PATH"
 export PATH="$HOME/.bun/bin:$PATH"
+export PATH="$HOME/.cargo/bin:$PATH"
+export PATH="/usr/local/go/bin:$PATH"
