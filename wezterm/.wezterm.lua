@@ -1,7 +1,43 @@
 local wezterm = require("wezterm")
+local act = wezterm.action
 
 local config = wezterm.config_builder()
-
+local window_background_opacity = 0.9
+local default_wsl_distribution = "Ubuntu-24.04"
+local keybind_help = {
+  { key = "F1", desc = "Open this keybind help overlay" },
+  { key = "Alt+q", desc = "Leader key. Press this first, then the next key within 2 seconds" },
+  { key = "Ctrl+A", desc = "Quick Select mode" },
+  { key = "Ctrl+O", desc = "Toggle window background opacity" },
+  { key = "Ctrl+E", desc = "Toggle ligatures on and off" },
+  { key = "Ctrl+,", desc = "Open the WezTerm config file in a new window" },
+  { key = "Alt+q then c", desc = "Open a new tab in the current shell" },
+  { key = "Alt+q then w", desc = "Open a new Windows PowerShell tab" },
+  { key = "Alt+q then x", desc = "Close the current pane with confirmation" },
+  { key = "Alt+q then b", desc = "Go to the previous tab" },
+  { key = "Alt+q then n", desc = "Go to the next tab" },
+  { key = "Alt+q then 0-9", desc = "Jump directly to tab 0 through 9" },
+  { key = "Alt+q then \\", desc = "Split the current pane side by side" },
+  { key = "Alt+q then -", desc = "Split the current pane vertically" },
+  { key = "Alt+q then h", desc = "Move to the pane on the left" },
+  { key = "Alt+q then j", desc = "Move to the pane below" },
+  { key = "Alt+q then k", desc = "Move to the pane above" },
+  { key = "Alt+q then l", desc = "Move to the pane on the right" },
+  { key = "Alt+q then Left", desc = "Make the current pane wider to the left" },
+  { key = "Alt+q then Right", desc = "Make the current pane wider to the right" },
+  { key = "Alt+q then Up", desc = "Make the current pane taller upward" },
+  { key = "Alt+q then Down", desc = "Make the current pane taller downward" },
+  { key = "Ctrl+Shift+C", desc = "Copy to clipboard" },
+  { key = "Ctrl+V", desc = "Paste from clipboard" },
+  { key = "Ctrl+T", desc = "Open a new tab" },
+  { key = "Ctrl+W", desc = "Close the current tab" },
+  { key = "Ctrl+Tab", desc = "Go to the next tab" },
+  { key = "Ctrl+Shift+Tab", desc = "Go to the previous tab" },
+  { key = "Ctrl+P", desc = "Open the command palette" },
+  { key = "Ctrl+R", desc = "Reload the WezTerm config" },
+  { key = "Ctrl+F", desc = "Search in the current terminal scrollback" },
+  { key = "Alt+Enter", desc = "Toggle fullscreen" },
+}
 
 -- ===================================================
 -- Leader Key:
@@ -14,7 +50,7 @@ local config = wezterm.config_builder()
 --    - LEADER + x: Close the current pane (with confirmation).
 --    - LEADER + b: Switch to the previous tab.
 --    - LEADER + n: Switch to the next tab.
---    - LEADER + <number>: Switch to a specific tab (0–9).
+--    - LEADER + <number>: Switch to a specific tab (0-9).
 
 -- 2. Pane Splitting:
 --    - LEADER + |: Split the current pane horizontally into two panes.
@@ -33,25 +69,39 @@ local config = wezterm.config_builder()
 --    - LEADER + UpArrow: Increase the pane size upward by 5 units.
 
 -- 5. Status Line:
---    - The status line indicates when the leader key is active, displaying an ocean wave emoji (🌊).
+--    - The status line indicates when the leader key is active, displaying an ocean wave emoji.
 
--- Miscellaneous Configurations:
--- - Tabs are shown even if there's only one tab.
--- - The tab bar is located at the bottom of the terminal window.
--- - Tab and split indices are zero-based.
-
-
+-- 6. Local Windows Shell:
+--    - LEADER + w: Open a new Windows tab in the local domain.
+-- 7. Keybind Help:
+--    - F1: Open an overlay listing key assignments.
 
 -- Appearance
 config.window_background_opacity = window_background_opacity
-config.macos_window_background_blur = 10
 config.window_decorations = "RESIZE"
-config.native_macos_fullscreen_mode = false
-config.font = wezterm.font("MesloLGS Nerd Font Mono")
+config.font = wezterm.font_with_fallback({
+  "JetBrains Mono",
+  "Symbols Nerd Font Mono",
+})
 config.color_scheme = "Catppuccin Macchiato"
+config.font_size = 12
 
--- config.color_scheme = 'iterm2'
-config.font_size = 12 
+-- Start in WSL by default. Use a WSL domain (not default_prog) so that
+-- SpawnTab("CurrentPaneDomain") inherits the current pane's CWD via OSC 7
+-- instead of launching wsl.exe fresh and overwriting it.
+config.wsl_domains = {
+  {
+    name = "WSL:" .. default_wsl_distribution,
+    distribution = default_wsl_distribution,
+    default_cwd = "~",
+  },
+}
+config.default_domain = "WSL:" .. default_wsl_distribution
+config.launch_menu = {
+  { label = "Ubuntu-24.04 (WSL)", domain = { DomainName = "WSL:" .. default_wsl_distribution } },
+  { label = "PowerShell", args = { "powershell.exe", "-NoLogo" } },
+  { label = "Command Prompt", args = { "cmd.exe" } },
+}
 
 -- tab bar
 config.hide_tab_bar_if_only_one_tab = false
@@ -60,169 +110,221 @@ config.use_fancy_tab_bar = false
 config.tab_and_split_indices_are_zero_based = true
 
 -- Utility functions
-local window_background_opacity = 0.9
 local function toggle_window_background_opacity(window)
-    local overrides = window:get_config_overrides() or {}
-    if not overrides.window_background_opacity then
-        overrides.window_background_opacity = 1.0
-    else
-        overrides.window_background_opacity = nil
-    end
-    window:set_config_overrides(overrides)
+  local overrides = window:get_config_overrides() or {}
+  if not overrides.window_background_opacity then
+    overrides.window_background_opacity = 1.0
+  else
+    overrides.window_background_opacity = nil
+  end
+  window:set_config_overrides(overrides)
 end
 wezterm.on("toggle-window-background-opacity", toggle_window_background_opacity)
 
 local function toggle_ligatures(window)
   local overrides = window:get_config_overrides() or {}
   if not overrides.harfbuzz_features then
-    overrides.harfbuzz_features = { 'calt=0', 'clig=0', 'liga=0' }
+    overrides.harfbuzz_features = { "calt=0", "clig=0", "liga=0" }
   else
     overrides.harfbuzz_features = nil
   end
   window:set_config_overrides(overrides)
 end
 wezterm.on("toggle-ligatures", toggle_ligatures)
+local function show_keybind_help(window, pane)
+  local choices = {}
+  for _, item in ipairs(keybind_help) do
+    table.insert(choices, {
+      id = item.key,
+      label = string.format("%-22s  %s", item.key, item.desc),
+    })
+  end
+
+  window:perform_action(
+    act.InputSelector({
+      title = "WezTerm Keybinds",
+      description = "Search or scroll to see your keybinds. Enter closes the overlay.",
+      fuzzy = true,
+      choices = choices,
+      action = wezterm.action_callback(function(inner_window, _, _, label)
+        if label then
+          inner_window:toast_notification("WezTerm Keybinds", label, nil, 2500)
+        end
+      end),
+    }),
+    pane
+  )
+end
 
 -- Keybindings
--- tmux
 config.leader = { key = "q", mods = "ALT", timeout_milliseconds = 2000 }
 config.keys = {
   -- Default QuickSelect keybind (CTRL-SHIFT-Space) gets captured by something
   -- else on my system
   {
-    key = 'A',
-    mods = 'CTRL|SHIFT',
-    action = wezterm.action.QuickSelect,
+    key = "a",
+    mods = "CTRL",
+    action = act.QuickSelect,
   },
   {
-    key = "O",
-    mods = 'CTRL|SHIFT',
-    action = wezterm.action.EmitEvent("toggle-window-background-opacity"),
+    key = "o",
+    mods = "CTRL",
+    action = act.EmitEvent("toggle-window-background-opacity"),
   },
   {
-    key = "E",
-    mods = 'CTRL|SHIFT',
-    action = wezterm.action.EmitEvent("toggle-ligatures"),
+    key = "e",
+    mods = "CTRL",
+    action = act.EmitEvent("toggle-ligatures"),
   },
-  -- Quickly open config file with common macOS keybind
   {
-    key = ',',
-    mods = 'SUPER',
-    action = wezterm.action.SpawnCommandInNewWindow({
-      cwd = os.getenv 'WEZTERM_CONFIG_DIR',
-      args = { os.getenv 'SHELL', '-c', '$VISUAL $WEZTERM_CONFIG_FILE' },
+    key = "F1",
+    action = wezterm.action_callback(show_keybind_help),
+  },
+  {
+    key = ",",
+    mods = "CTRL",
+    action = act.SpawnCommandInNewWindow({
+      cwd = os.getenv("WEZTERM_CONFIG_DIR"),
+      args = { "powershell.exe", "-NoLogo", "-Command", "$env:VISUAL $env:WEZTERM_CONFIG_FILE" },
     }),
   },
-
-    {
-        mods = "LEADER",
-        key = "c",
-        action = wezterm.action.SpawnTab "CurrentPaneDomain",
-    },
-    {
-        mods = "LEADER",
-        key = "x",
-        action = wezterm.action.CloseCurrentPane { confirm = true }
-    },
-    {
-        mods = "LEADER",
-        key = "b",
-        action = wezterm.action.ActivateTabRelative(-1)
-    },
-    {
-        mods = "LEADER",
-        key = "n",
-        action = wezterm.action.ActivateTabRelative(1)
-    },
-    {
-        mods = "LEADER",
-        key = "|",
-        action = wezterm.action.SplitHorizontal { domain = "CurrentPaneDomain" }
-    },
-    {
-        mods = "LEADER",
-        key = "-",
-        action = wezterm.action.SplitVertical { domain = "CurrentPaneDomain" }
-    },
-    {
-        mods = "LEADER",
-        key = "h",
-        action = wezterm.action.ActivatePaneDirection "Left"
-    },
-    {
-        mods = "LEADER",
-        key = "j",
-        action = wezterm.action.ActivatePaneDirection "Down"
-    },
-    {
-        mods = "LEADER",
-        key = "k",
-        action = wezterm.action.ActivatePaneDirection "Up"
-    },
-    {
-        mods = "LEADER",
-        key = "l",
-        action = wezterm.action.ActivatePaneDirection "Right"
-    },
-    {
-        mods = "LEADER",
-        key = "LeftArrow",
-        action = wezterm.action.AdjustPaneSize { "Left", 5 }
-    },
-    {
-        mods = "LEADER",
-        key = "RightArrow",
-        action = wezterm.action.AdjustPaneSize { "Right", 5 }
-    },
-    {
-        mods = "LEADER",
-        key = "DownArrow",
-        action = wezterm.action.AdjustPaneSize { "Down", 5 }
-    },
-    {
-        mods = "LEADER",
-        key = "UpArrow",
-        action = wezterm.action.AdjustPaneSize { "Up", 5 }
-    },
+  {
+    key = "t",
+    mods = "CTRL",
+    action = act.SpawnTab("CurrentPaneDomain"),
+  },
+  {
+    key = "w",
+    mods = "CTRL",
+    action = act.CloseCurrentTab({ confirm = true }),
+  },
+  {
+    key = "p",
+    mods = "CTRL",
+    action = act.ActivateCommandPalette,
+  },
+  {
+    key = "r",
+    mods = "CTRL",
+    action = act.ReloadConfiguration,
+  },
+  {
+    key = "f",
+    mods = "CTRL",
+    action = act.Search("CurrentSelectionOrEmptyString"),
+  },
+  {
+    key = "v",
+    mods = "CTRL",
+    action = act.PasteFrom("Clipboard"),
+  },
+  {
+    mods = "LEADER",
+    key = "c",
+    action = act.SpawnTab("CurrentPaneDomain"),
+  },
+  {
+    mods = "LEADER",
+    key = "w",
+    action = act.SpawnCommandInNewTab({
+      args = { "powershell.exe", "-NoLogo" },
+    }),
+  },
+  {
+    mods = "LEADER",
+    key = "x",
+    action = act.CloseCurrentPane({ confirm = true }),
+  },
+  {
+    mods = "LEADER",
+    key = "b",
+    action = act.ActivateTabRelative(-1),
+  },
+  {
+    mods = "LEADER",
+    key = "n",
+    action = act.ActivateTabRelative(1),
+  },
+  {
+    mods = "LEADER",
+    key = "\\",
+    action = act.SplitHorizontal({ domain = "CurrentPaneDomain" }),
+  },
+  {
+    mods = "LEADER",
+    key = "-",
+    action = act.SplitVertical({ domain = "CurrentPaneDomain" }),
+  },
+  {
+    mods = "LEADER",
+    key = "h",
+    action = act.ActivatePaneDirection("Left"),
+  },
+  {
+    mods = "LEADER",
+    key = "j",
+    action = act.ActivatePaneDirection("Down"),
+  },
+  {
+    mods = "LEADER",
+    key = "k",
+    action = act.ActivatePaneDirection("Up"),
+  },
+  {
+    mods = "LEADER",
+    key = "l",
+    action = act.ActivatePaneDirection("Right"),
+  },
+  {
+    mods = "LEADER",
+    key = "LeftArrow",
+    action = act.AdjustPaneSize({ "Left", 5 }),
+  },
+  {
+    mods = "LEADER",
+    key = "RightArrow",
+    action = act.AdjustPaneSize({ "Right", 5 }),
+  },
+  {
+    mods = "LEADER",
+    key = "DownArrow",
+    action = act.AdjustPaneSize({ "Down", 5 }),
+  },
+  {
+    mods = "LEADER",
+    key = "UpArrow",
+    action = act.AdjustPaneSize({ "Up", 5 }),
+  },
 }
 
 for i = 0, 9 do
-    -- leader + number to activate that tab
-    table.insert(config.keys, {
-        key = tostring(i),
-        mods = "LEADER",
-        action = wezterm.action.ActivateTab(i),
-    })
+  table.insert(config.keys, {
+    key = tostring(i),
+    mods = "LEADER",
+    action = act.ActivateTab(i),
+  })
 end
 
--- tmux status
 wezterm.on("update-right-status", function(window, _)
-    local SOLID_LEFT_ARROW = ""
-    local ARROW_FOREGROUND = { Foreground = { Color = "#c6a0f6" } }
-    local prefix = ""
+  local solid_left_arrow = ""
+  local arrow_foreground = { Foreground = { Color = "#c6a0f6" } }
+  local prefix = ""
 
-    if window:leader_is_active() then
-        prefix = " " .. utf8.char(0x1f30a) -- ocean wave
-        SOLID_LEFT_ARROW = utf8.char(0xe0b2)
-    end
+  if window:leader_is_active() then
+    prefix = " " .. utf8.char(0x1F30A)
+    solid_left_arrow = utf8.char(0xE0B2)
+  end
 
-    if window:active_tab():tab_id() ~= 0 then
-        ARROW_FOREGROUND = { Foreground = { Color = "#1e2030" } }
-    end -- arrow color based on if tab is first pane
+  if window:active_tab():tab_id() ~= 0 then
+    arrow_foreground = { Foreground = { Color = "#1e2030" } }
+  end
 
-    window:set_left_status(wezterm.format {
-        { Background = { Color = "#b7bdf8" } },
-        { Text = prefix },
-        ARROW_FOREGROUND,
-        { Text = SOLID_LEFT_ARROW }
-    })
+  window:set_left_status(wezterm.format({
+    { Background = { Color = "#b7bdf8" } },
+    { Text = prefix },
+    arrow_foreground,
+    { Text = solid_left_arrow },
+  }))
 end)
 
 return config
-
-
-
-
-
-
-
